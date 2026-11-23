@@ -173,7 +173,7 @@
       <ol>
         <li>Clique em <b>Baixar PNG</b>.</li>
         <li>No Gmail: <b>Configurações (engrenagem) → Ver todas as configurações → Geral → Assinatura</b>.</li>
-        <li>Clique em <b>Criar nova</b>, dê um nome e, na barra da caixa de texto, clique no ícone <b>Inserir imagem</b>.</li>
+        <li>Clique em <b>Criar novo</b>, dê um nome, Clique em <b>Criar</b> e, na barra da caixa de texto, clique no ícone <b>Inserir imagem</b>.</li>
         <li>Na aba <b>Fazer upload</b>, escolha o PNG baixado.</li>
         <li>Role até o fim da página e clique em <b>Salvar alterações</b>.</li>
       </ol>
@@ -230,6 +230,19 @@
   };
   const LIMITE_DIREITO = W - 12;   // texto não pode passar daqui
 
+  // ============================================================
+  // TEXTOS DE EXEMPLO (só aparecem na pré-visualização)
+  // Nunca são colocados nos campos nem exportados no PNG.
+  // PLACEHOLDER_ALPHA: 1 = exemplo com a mesma cor do texto real;
+  // menor que 1 = exemplo mais clarinho, pra indicar que é só um modelo.
+  // ============================================================
+  const EXEMPLOS = {
+    setor: "Seu setor",
+    nome:  "Seu nome",
+    email: "seu.nome@rpontes.com.br"
+  };
+  const PLACEHOLDER_ALPHA = 0.45;
+
   const $ = (id) => document.getElementById(id);
   const cv = $("cv");
   const ctx = cv.getContext("2d");
@@ -254,10 +267,11 @@
   }
 
   // Desenha uma sequência de trechos (negrito/regular) e devolve o x final
-  function desenhaTrechos(trechos, x, y, size) {
+  function desenhaTrechos(trechos, x, y, size, alpha = 1) {
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
     ctx.fillStyle = COR;
+    ctx.globalAlpha = alpha;
     const track = size * TRACKING;
     const nativo = "letterSpacing" in ctx;
     for (const [texto, peso] of trechos) {
@@ -276,24 +290,60 @@
         }
       }
     }
+    ctx.globalAlpha = 1;
     return x;
   }
 
-  function desenhar() {
+  // Devolve o que deve ser desenhado em cada linha.
+  // Valor real quando o campo está preenchido; exemplo só se permitido (prévia).
+  function textoDoCampo(id, mostrarExemplos) {
+    if (id === "setor") {
+      const real = maiusculo($("setor").value);
+      if (real) return { partes: [[real, 400]], exemplo: false };
+      return mostrarExemplos
+        ? { partes: [[maiusculo(EXEMPLOS.setor), 400]], exemplo: true }
+        : { partes: [], exemplo: false };
+    }
+    if (id === "nome") {
+      const real = $("nome").value.trim();
+      if (real) {
+        const n = dividirNome(maiusculo(real));
+        return { partes: [[n[0], 700], [n[1], 400]], exemplo: false };
+      }
+      if (!mostrarExemplos) return { partes: [], exemplo: false };
+      const n = dividirNome(maiusculo(EXEMPLOS.nome));
+      return { partes: [[n[0], 700], [n[1], 400]], exemplo: true };
+    }
+    // e-mail
+    const real = dividirEmail($("email").value);
+    if (real[0] || real[1]) {
+      return { partes: [[real[0], 700], [real[1], 400]], exemplo: false };
+    }
+    if (!mostrarExemplos) return { partes: [], exemplo: false };
+    const ex = dividirEmail(EXEMPLOS.email);
+    return { partes: [[ex[0], 700], [ex[1], 400]], exemplo: true };
+  }
+
+  // mostrarExemplos = true  -> prévia na tela (exemplos nos campos vazios)
+  // mostrarExemplos = false -> exportação (somente dados realmente preenchidos)
+  function desenhar(mostrarExemplos = true) {
+    mostrarExemplos = mostrarExemplos === true;   // ignora o objeto Event dos listeners
+
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, W, H);
     if (baseOk) ctx.drawImage(baseImg, 0, 0, W, H);
 
-    const setor = maiusculo($("setor").value);
-    const nome = dividirNome(maiusculo($("nome").value));
-    const mail = dividirEmail($("email").value);
+    let maiorFim = 0;
+    for (const id of ["setor", "nome", "email"]) {
+      const t = textoDoCampo(id, mostrarExemplos);
+      const linha = LINHAS[id];
+      const alpha = t.exemplo ? PLACEHOLDER_ALPHA : 1;
+      const fim = desenhaTrechos(t.partes, X, linha.y, linha.size, alpha);
+      if (!t.exemplo) maiorFim = Math.max(maiorFim, fim);   // aviso só considera dados reais
+    }
 
-    const fimSetor = desenhaTrechos([[setor, 400]], X, LINHAS.setor.y, LINHAS.setor.size);
-    const fimNome  = desenhaTrechos([[nome[0], 700], [nome[1], 400]], X, LINHAS.nome.y, LINHAS.nome.size);
-    const fimMail  = desenhaTrechos([[mail[0], 700], [mail[1], 400]], X, LINHAS.email.y, LINHAS.email.size);
-
-    $("warn").classList.toggle("show", Math.max(fimSetor, fimNome, fimMail) > LIMITE_DIREITO);
+    $("warn").classList.toggle("show", maiorFim > LIMITE_DIREITO);
   }
 
   function toast(msg) {
@@ -311,7 +361,22 @@
   }
 
   function paraBlob() {
-    return new Promise((resolve) => cv.toBlob(resolve, "image/png"));
+    return new Promise((resolve, reject) => {
+      cv.toBlob((blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Não foi possível gerar a imagem PNG."));
+      }, "image/png");
+    });
+  }
+
+  // Gera o PNG sem o texto de exemplo e restaura a prévia em seguida.
+  async function gerarBlobFinal() {
+    desenhar(false);
+    try {
+      return await paraBlob();
+    } finally {
+      desenhar(true);
+    }
   }
 
   function setorEscolhido() {
@@ -323,7 +388,7 @@
 
   async function baixar() {
     if (!setorEscolhido()) return;
-    const blob = await paraBlob();
+    const blob = await gerarBlobFinal();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = nomeArquivo();
@@ -337,7 +402,7 @@
   async function copiar() {
     if (!setorEscolhido()) return;
     try {
-      const blob = await paraBlob();
+      const blob = await gerarBlobFinal();
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
       toast("Imagem copiada! Agora é só colar.");
     } catch (e) {
@@ -348,28 +413,28 @@
   // Monta o menu de setores
   (function montarSetores() {
     const sel = $("setor");
-    const vazio = new Option("Selecione o setor...", "", true, true);
+    const vazio = new Option("Selecione seu setor", "", true, true);
     vazio.disabled = true;
     sel.add(vazio);
     SETORES.forEach((s) => sel.add(new Option(s, s)));
   })();
 
   ["setor", "nome", "email"].forEach((id) => {
-    $(id).addEventListener("input", desenhar);
-    $(id).addEventListener("change", desenhar);
+    $(id).addEventListener("input", () => desenhar(true));
+    $(id).addEventListener("change", () => desenhar(true));
   });
   $("btnBaixar").addEventListener("click", baixar);
   $("btnCopiar").addEventListener("click", copiar);
 
   // Só desenha depois que o fundo e as duas fontes carregarem
-  baseImg.onload = () => { baseOk = true; desenhar(); };
+  baseImg.onload = () => { baseOk = true; desenhar(true); };
   baseImg.src = BASE_SRC;
   Promise.all([
     document.fonts.load("700 20px Montserrat"),
     document.fonts.load("400 14px Montserrat"),
     document.fonts.load("400 20px Montserrat")
-  ]).then(() => { fontesOk = true; desenhar(); }).catch(desenhar);
-  desenhar();
+  ]).then(() => { fontesOk = true; desenhar(true); }).catch(() => desenhar(true));
+  desenhar(true);
 </script>
 </body>
 </html>
