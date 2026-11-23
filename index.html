@@ -66,6 +66,18 @@
     background: #fff;
   }
   input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  select {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    color: var(--text);
+    background: #fff;
+    cursor: pointer;
+  }
+  select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
   .hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
   .warn { font-size: 12px; color: #b3261e; margin-top: 10px; display: none; }
   .warn.show { display: block; }
@@ -114,7 +126,7 @@
 
   @media (prefers-color-scheme: dark) {
     :root { --bg: #17140f; --card: #211d18; --text: #f1ece6; --muted: #a39b92; --border: #3a342d; }
-    input[type=text] { background: #17140f; }
+    input[type=text], select { background: #17140f; }
     .primary { background: #f1ece6; color: #231f20; }
     .secondary { background: #342e27; }
     /* a assinatura sempre aparece sobre fundo branco, como vai ficar no e-mail */
@@ -133,14 +145,14 @@
     <h2>Dados do colaborador</h2>
 
     <label for="setor">Setor</label>
-    <input type="text" id="setor" value="Setor" autocomplete="off">
+    <select id="setor"></select>
 
     <label for="nome">Nome completo</label>
-    <input type="text" id="nome" value="SEU NOME" autocomplete="off">
+    <input type="text" id="nome" value="Seu nome" autocomplete="off">
     <div class="hint">O primeiro nome sai em negrito e o resto em regular, como no modelo.</div>
 
     <label for="email">E-mail</label>
-    <input type="text" id="email" value="SEU.NOME@rpontes.com.br" autocomplete="off" inputmode="email">
+    <input type="text" id="email" value="seu.nome@rpontes.com.br" autocomplete="off" inputmode="email">
     <div class="hint">Se digitar só a parte antes do @, completa com <b>@rpontes.com.br</b>.</div>
 
     <div class="warn" id="warn">O texto passou da área da assinatura. Encurte o nome ou o e-mail.</div>
@@ -183,6 +195,28 @@
 <script>
   // Fundo padrão (telefone, ícone, linha e logo R PONTES), embutido no arquivo
   const BASE_SRC = "data:image/png;base64,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";
+
+  // ============================================================
+  // LISTA DE SETORES
+  // Pra mudar a lista, edite só os nomes entre aspas abaixo.
+  // Cada linha é um setor, separada por vírgula. A ordem aqui é
+  // a ordem que aparece no menu.
+  // ============================================================
+  const SETORES = [
+    "ADMINISTRATIVO",
+    "ADMINISTRATIVO DE OBRA",
+    "ALMOXARIFADO",
+    "ANÁLISE DE DADOS",
+    "ASSISTÊNCIA TÉCNICA",
+    "COMERCIAL",
+    "FINANCEIRO",
+    "ENGENHARIA",
+    "GESTÃO DE PESSOAS",
+    "MARKETING",
+    "PLANEJAMENTO",
+    "SUPRIMENTOS",
+    "T.I."
+  ];
 
   // Medidas tiradas do modelo de referência (pixels da imagem 546 x 141)
   const W = 546, H = 141;
@@ -280,7 +314,15 @@
     return new Promise((resolve) => cv.toBlob(resolve, "image/png"));
   }
 
+  function setorEscolhido() {
+    if ($("setor").value) return true;
+    toast("Selecione o setor antes de continuar.");
+    $("setor").focus();
+    return false;
+  }
+
   async function baixar() {
+    if (!setorEscolhido()) return;
     const blob = await paraBlob();
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -293,6 +335,7 @@
   }
 
   async function copiar() {
+    if (!setorEscolhido()) return;
     try {
       const blob = await paraBlob();
       await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
@@ -302,7 +345,19 @@
     }
   }
 
-  ["setor", "nome", "email"].forEach((id) => $(id).addEventListener("input", desenhar));
+  // Monta o menu de setores
+  (function montarSetores() {
+    const sel = $("setor");
+    const vazio = new Option("Selecione o setor...", "", true, true);
+    vazio.disabled = true;
+    sel.add(vazio);
+    SETORES.forEach((s) => sel.add(new Option(s, s)));
+  })();
+
+  ["setor", "nome", "email"].forEach((id) => {
+    $(id).addEventListener("input", desenhar);
+    $(id).addEventListener("change", desenhar);
+  });
   $("btnBaixar").addEventListener("click", baixar);
   $("btnCopiar").addEventListener("click", copiar);
 
